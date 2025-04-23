@@ -229,28 +229,39 @@ const GeminiChat: React.FC<GeminiChatProps> = ({ visible = false, onClose }) => 
         throw new Error(error.message);
       }
       
-      playSoundEffect('success');
+      if (isSoundEnabled) {
+        play('success', { volume: volume / 100 });
+      }
       
       // Check if the message contains recipe-related terms to ensure the button shows up
-      const hasRecipeTerms = userMessage.toLowerCase().includes('recipe') || 
-                             userMessage.toLowerCase().includes('meal') || 
-                             userMessage.toLowerCase().includes('food') || 
-                             userMessage.toLowerCase().includes('eat') ||
-                             userMessage.toLowerCase().includes('cook');
+      const isRecipeQuery = userMessage.toLowerCase().includes('recipe') || 
+                           userMessage.toLowerCase().includes('meal') || 
+                           userMessage.toLowerCase().includes('food') || 
+                           userMessage.toLowerCase().includes('eat') ||
+                           userMessage.toLowerCase().includes('cook');
       
-      // Generate a simple recipe object if it's a recipe query and no recipe data was returned
-      const recipeData = data.recipeData || (hasRecipeTerms ? [{
-        title: "AI Generated Recipe",
-        summary: "Recipe details extracted from chat",
-        calories: 300,
-        protein: 25,
-        carbs: 40, 
-        fat: 15,
-        image: "https://images.unsplash.com/photo-1512621776951-a57141f2eefd?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80",
-        diets: ["Balanced"],
-        readyInMinutes: 30,
-        servings: 2
-      }] : []);
+      // Generate recipe data if it's a recipe query
+      let recipeData = data.recipeData || [];
+      
+      // If it's a recipe query but no recipe data was returned, create a simple recipe object
+      if (isRecipeQuery && recipeData.length === 0) {
+        // Extract recipe information from the AI response
+        const aiResponse = data.reply || "";
+        
+        // Create a basic recipe from the AI response
+        recipeData = [{
+          title: aiResponse.split('\n')[0] || "AI Generated Recipe",
+          summary: aiResponse,
+          calories: 300,
+          protein: 25,
+          carbs: 40, 
+          fat: 15,
+          image: "https://images.unsplash.com/photo-1512621776951-a57141f2eefd?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80",
+          diets: ["Balanced"],
+          readyInMinutes: 30,
+          servings: 2
+        }];
+      }
       
       const aiMessage: Message = {
         id: (Date.now() + 1).toString(),
@@ -259,13 +270,16 @@ const GeminiChat: React.FC<GeminiChatProps> = ({ visible = false, onClose }) => 
         timestamp: new Date(),
         workoutData: data.workoutData || [],
         recipeData: recipeData,
-        dataType: data.dataType || (hasRecipeTerms ? 'recipe' : null)
+        dataType: data.dataType || (isRecipeQuery ? 'recipe' : null)
       };
       
       setConversation(prev => [...prev, aiMessage]);
     } catch (error) {
       console.error('Error fetching Gemini response:', error);
-      playSoundEffect('failure');
+      
+      if (isSoundEnabled) {
+        play('failure', { volume: volume / 100 });
+      }
       
       toast({
         title: "Error",
@@ -500,7 +514,20 @@ const GeminiChat: React.FC<GeminiChatProps> = ({ visible = false, onClose }) => 
                 <Button
                   variant="ghost" 
                   size="icon"
-                  onClick={resetChat}
+                  onClick={() => { 
+                    setConversation([{
+                      id: '0',
+                      content: "Hi there! I'm your wellness assistant. How can I help you with workouts, nutrition, or mindfulness today?",
+                      sender: 'ai',
+                      timestamp: new Date()
+                    }]);
+                    sessionStorage.removeItem(CHAT_HISTORY_KEY);
+                    if (isSoundEnabled) play('notification', { volume: volume / 100 });
+                    toast({
+                      title: "Chat Reset",
+                      description: "Your conversation has been reset."
+                    });
+                  }}
                   className="text-white hover:bg-purple-700 mr-1"
                   title="Reset conversation"
                 >
@@ -541,7 +568,7 @@ const GeminiChat: React.FC<GeminiChatProps> = ({ visible = false, onClose }) => 
                       min={0}
                       max={100}
                       step={1}
-                      onValueChange={handleVolumeChange}
+                      onValueChange={(newVolume) => setVolume(newVolume[0])}
                       className="flex-1"
                     />
                     <span className="text-xs text-gray-500 ml-2 w-8">{volume}%</span>
@@ -555,8 +582,153 @@ const GeminiChat: React.FC<GeminiChatProps> = ({ visible = false, onClose }) => 
                 <GeminiMessageList 
                   messages={conversation} 
                   isLoading={isLoading}
-                  onAddWorkout={handleAddWorkout}
-                  onSaveRecipe={handleSaveRecipe} 
+                  onAddWorkout={(workout) => {
+                    if (!user) {
+                      toast({
+                        title: "Sign in required",
+                        description: "Please sign in to save workout plans",
+                        variant: "default",
+                      });
+                      return;
+                    }
+                  
+                    try {
+                      console.log("Saving workout to Supabase:", workout);
+                  
+                      let workoutData: any = {
+                        user_id: user.id,
+                        title: workout.title || "Custom Workout",
+                        type: workout.type || "General",
+                        duration: workout.duration || 30,
+                        calories_burned: workout.calories_burned || 300,
+                        date: new Date().toISOString().split('T')[0]
+                      };
+                  
+                      // Handle workout pack
+                      if (workout.isWorkoutPack && workout.originalWorkouts) {
+                        workoutData.exercises = JSON.stringify(workout.exercises || []);
+                        workoutData.is_pack = true;
+                        workoutData.pack_items = JSON.stringify(workout.originalWorkouts);
+                      } else {
+                        // Regular workout
+                        workoutData.exercises = typeof workout.exercises === 'string' 
+                          ? workout.exercises 
+                          : JSON.stringify(workout.exercises || []);
+                      }
+                  
+                      supabase.from('workouts').insert(workoutData)
+                        .then(({ error }) => {
+                          if (error) {
+                            console.error("Supabase error:", error);
+                            throw error;
+                          }
+                          
+                          if (isSoundEnabled) play('success', { volume: volume / 100 });
+                          
+                          toast({
+                            title: workout.isWorkoutPack ? "Workout Pack Added" : "Workout Added",
+                            description: `The workout ${workout.isWorkoutPack ? 'pack' : ''} has been added to your workout plan`,
+                          });
+                          
+                          navigate('/workouts');
+                        })
+                        .catch((error) => {
+                          console.error('Error saving workout:', error);
+                          if (isSoundEnabled) play('failure', { volume: volume / 100 });
+                          
+                          toast({
+                            title: "Error",
+                            description: "Failed to add workout. Please try again.",
+                            variant: "destructive"
+                          });
+                        });
+                    } catch (error) {
+                      console.error('Error saving workout:', error);
+                      if (isSoundEnabled) play('failure', { volume: volume / 100 });
+                      
+                      toast({
+                        title: "Error",
+                        description: "Failed to add workout. Please try again.",
+                        variant: "destructive"
+                      });
+                    }
+                  }}
+                  onSaveRecipe={(recipe) => {
+                    if (!user) {
+                      toast({
+                        title: "Sign in required",
+                        description: "Please sign in to save recipes",
+                        variant: "default",
+                      });
+                      return;
+                    }
+                  
+                    try {
+                      console.log("Saving recipe to nutrition_logs:", recipe);
+                  
+                      // Prepare recipe data for saving to nutrition_logs
+                      const recipeData = {
+                        user_id: user.id,
+                        food_name: recipe.title || "AI Generated Recipe",
+                        calories: recipe.nutrition?.calories || recipe.calories || 300,
+                        protein: recipe.nutrition?.protein || recipe.protein || 25,
+                        carbs: recipe.nutrition?.carbs || recipe.carbs || 40,
+                        fat: recipe.nutrition?.fat || recipe.fat || 15,
+                        meal_type: "recipe",
+                        date: new Date().toISOString().split('T')[0],
+                        recipe_details: JSON.stringify({
+                          image: recipe.image || "https://images.unsplash.com/photo-1512621776951-a57141f2eefd?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80",
+                          time: recipe.readyInMinutes ? `${recipe.readyInMinutes} min` : "20 min",
+                          servings: recipe.servings || 2,
+                          description: recipe.summary || "AI-generated recipe",
+                          ingredients: recipe.extendedIngredients?.map((ing: any) => ing.original) || 
+                                      recipe.ingredients || [],
+                          instructions: recipe.analyzedInstructions?.[0]?.steps?.map((step: any) => step.step) || 
+                                      recipe.instructions || [],
+                          tags: recipe.diets || recipe.tags || ["AI Generated"],
+                          category: "ai"
+                        })
+                      };
+                  
+                      console.log("Formatted recipe data:", recipeData);
+                  
+                      supabase.from('nutrition_logs').insert(recipeData)
+                        .then(({ error }) => {
+                          if (error) {
+                            console.error("Supabase error:", error);
+                            throw error;
+                          }
+                          
+                          if (isSoundEnabled) play('success', { volume: volume / 100 });
+                          
+                          toast({
+                            title: "Recipe Saved",
+                            description: "The recipe has been saved to your nutrition collection",
+                          });
+                          
+                          navigate('/nutrition');
+                        })
+                        .catch((error) => {
+                          console.error('Error saving recipe:', error);
+                          if (isSoundEnabled) play('failure', { volume: volume / 100 });
+                          
+                          toast({
+                            title: "Error",
+                            description: "Failed to save recipe. Please try again.",
+                            variant: "destructive"
+                          });
+                        });
+                    } catch (error) {
+                      console.error('Error saving recipe:', error);
+                      if (isSoundEnabled) play('failure', { volume: volume / 100 });
+                      
+                      toast({
+                        title: "Error",
+                        description: "Failed to save recipe. Please try again.",
+                        variant: "destructive"
+                      });
+                    }
+                  }} 
                 />
                 {isLoading && (
                   <div className="flex justify-start">
@@ -573,7 +745,7 @@ const GeminiChat: React.FC<GeminiChatProps> = ({ visible = false, onClose }) => 
             </div>
             
             {conversation.length < 3 && (
-              <GeminiSuggestions onSelectSuggestion={handleSelectSuggestion} />
+              <GeminiSuggestions onSelectSuggestion={(suggestion) => setMessage(suggestion)} />
             )}
             
             <GeminiChatInput 

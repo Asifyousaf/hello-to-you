@@ -52,8 +52,8 @@ interface Recipe {
   analyzedInstructions?: any[];
 }
 
-// Sample recipe data - expanded with more variety
-const sampleRecipes = [
+// Sample recipe data with isAIGenerated property added
+const sampleRecipes: Recipe[] = [
   {
     id: 1,
     title: "High Protein Overnight Oats",
@@ -80,7 +80,8 @@ const sampleRecipes = [
       "In the morning, top with sliced banana and berries before eating."
     ],
     tags: ["High Protein", "Breakfast", "Meal Prep"],
-    category: "breakfast"
+    category: "breakfast",
+    isAIGenerated: false
   },
   {
     id: 2,
@@ -110,7 +111,8 @@ const sampleRecipes = [
       "Drizzle dressing over the salad just before serving."
     ],
     tags: ["High Protein", "Lunch", "Salad"],
-    category: "lunch"
+    category: "lunch",
+    isAIGenerated: false
   },
   {
     id: 3,
@@ -136,7 +138,8 @@ const sampleRecipes = [
       "Enjoy immediately before it melts!"
     ],
     tags: ["High Protein", "Breakfast", "Post-Workout"],
-    category: "breakfast"
+    category: "breakfast",
+    isAIGenerated: false
   },
   {
     id: 4,
@@ -169,7 +172,8 @@ const sampleRecipes = [
       "Serve with remaining lemon wedges."
     ],
     tags: ["High Protein", "Dinner", "Omega-3"],
-    category: "dinner"
+    category: "dinner",
+    isAIGenerated: false
   },
   {
     id: 5,
@@ -202,7 +206,8 @@ const sampleRecipes = [
       "Serve at room temperature or chilled."
     ],
     tags: ["Vegetarian", "High Fiber", "Lunch"],
-    category: "lunch"
+    category: "lunch",
+    isAIGenerated: false
   },
   {
     id: 6,
@@ -227,7 +232,8 @@ const sampleRecipes = [
       "Pour into a glass and enjoy immediately."
     ],
     tags: ["High Protein", "Breakfast", "Post-Workout"],
-    category: "breakfast"
+    category: "breakfast",
+    isAIGenerated: false
   },
   {
     id: 7,
@@ -261,7 +267,8 @@ const sampleRecipes = [
       "Serve hot with your choice of toppings."
     ],
     tags: ["High Protein", "Dinner", "Meal Prep"],
-    category: "dinner"
+    category: "dinner",
+    isAIGenerated: false
   },
   {
     id: 8,
@@ -287,7 +294,8 @@ const sampleRecipes = [
       "Drizzle honey on top before serving."
     ],
     tags: ["Breakfast", "Snack", "High Protein"],
-    category: "snacks"
+    category: "snacks",
+    isAIGenerated: false
   }
 ];
 
@@ -348,7 +356,7 @@ const NutritionPage = () => {
       }
       
       if (nutritionLogsData && nutritionLogsData.length > 0) {
-        const formattedRecipes = nutritionLogsData.map((log: any, index: number) => {
+        const formattedRecipes: Recipe[] = nutritionLogsData.map((log: any, index: number) => {
           let parsedDetails: RecipeDetails = {};
           
           if (log.recipe_details) {

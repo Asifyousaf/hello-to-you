@@ -1,4 +1,3 @@
-
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
@@ -17,7 +16,7 @@ You are a certified personal trainer and nutritionist. You help users with begin
 
 When users ask about workout routines for specific body parts or goals, you should mention that you're checking the ExerciseDB for accurate information.
 
-When users ask about meal plans, recipes, or nutrition advice, you should mention that you're checking Spoonacular's database for verified recipes and nutritional information.
+When users ask about meal plans, recipes, or nutrition advice, you should format your response with recipe information at the beginning of your response. Always include a recipe name, ingredients (if appropriate), and preparation instructions. This helps the system identify and save recipes properly.
 
 If the user wants to add a workout to their routine, format the workout plan with a clear title, description, and list of exercises in a structured way. Start with: "WORKOUT_PLAN: {title}|{type}|{level}|{description}|{exercises}" so the system can parse it.
 
@@ -32,7 +31,7 @@ function isWorkoutQuery(query: string): boolean {
 
 // Function to detect if user is asking for nutrition information
 function isNutritionQuery(query: string): boolean {
-  const nutritionKeywords = ['food', 'meal', 'recipe', 'diet', 'nutrition', 'eat', 'calorie', 'protein', 'carb', 'vegan', 'vegetarian', 'gluten'];
+  const nutritionKeywords = ['food', 'meal', 'recipe', 'diet', 'nutrition', 'eat', 'calorie', 'protein', 'carb', 'vegan', 'vegetarian', 'gluten', 'cook', 'breakfast', 'lunch', 'dinner', 'snack', 'dessert'];
   return nutritionKeywords.some(keyword => query.toLowerCase().includes(keyword));
 }
 
@@ -81,11 +80,11 @@ async function fetchWorkoutData(query: string) {
   }
 }
 
-// Function to fetch recipe data from Spoonacular
+// Enhanced function to fetch recipe data from Spoonacular
 async function fetchRecipeData(query: string) {
   try {
     // Extract dietary preferences or calories from the query
-    const dietTypes = ['vegetarian', 'vegan', 'gluten free', 'keto', 'paleo'];
+    const dietTypes = ['vegetarian', 'vegan', 'gluten free', 'keto', 'paleo', 'low carb', 'high protein'];
     let dietType = dietTypes.find(diet => query.toLowerCase().includes(diet.toLowerCase()));
     
     // Extract calorie information
@@ -95,11 +94,17 @@ async function fetchRecipeData(query: string) {
       maxCalories = parseInt(calorieMatch[1]);
     }
     
+    // Extract meal type if specified
+    const mealTypes = ['breakfast', 'lunch', 'dinner', 'snack', 'dessert'];
+    let mealType = mealTypes.find(meal => query.toLowerCase().includes(meal.toLowerCase()));
+    
     // Build query parameters
     let params = new URLSearchParams({
       apiKey: spoonacularApiKey!,
-      number: '5', // Limit to 5 recipes
+      number: '3', // Limit to 3 recipes
       addRecipeInformation: 'true',
+      addRecipeNutrition: 'true',
+      fillIngredients: 'true',
       query: query
     });
     
@@ -109,6 +114,10 @@ async function fetchRecipeData(query: string) {
     
     if (maxCalories) {
       params.append('maxCalories', maxCalories.toString());
+    }
+    
+    if (mealType) {
+      params.append('type', mealType);
     }
     
     console.log(`Fetching recipe data with params: ${params.toString()}`);
@@ -121,11 +130,108 @@ async function fetchRecipeData(query: string) {
     }
     
     const data = await response.json();
-    return data.results;
+    
+    // Transform the recipe data to include nutrition information in a consistent format
+    const enhancedRecipes = data.results.map((recipe: any) => {
+      // Extract nutrition info if available
+      const nutrition = recipe.nutrition ? {
+        calories: recipe.nutrition?.nutrients?.find((n: any) => n.name === "Calories")?.amount || 0,
+        protein: recipe.nutrition?.nutrients?.find((n: any) => n.name === "Protein")?.amount || 0,
+        carbs: recipe.nutrition?.nutrients?.find((n: any) => n.name === "Carbohydrates")?.amount || 0,
+        fat: recipe.nutrition?.nutrients?.find((n: any) => n.name === "Fat")?.amount || 0
+      } : null;
+      
+      return {
+        ...recipe,
+        nutrition: nutrition
+      };
+    });
+    
+    return enhancedRecipes;
   } catch (error) {
     console.error('Error fetching recipe data:', error);
     return null;
   }
+}
+
+// Generate a basic recipe from AI content
+function generateBasicRecipe(aiReply: string) {
+  // Try to extract recipe title - usually the first line or first sentence
+  let title = aiReply.split('\n')[0].trim();
+  if (title.length > 60) {
+    // If first line is too long, use first 60 chars
+    title = title.substring(0, 60) + "...";
+  }
+  
+  const recipeLines = aiReply.split('\n').filter(line => line.trim().length > 0);
+  
+  // Try to identify ingredients section
+  let ingredients: string[] = [];
+  let ingredientsStart = -1;
+  let ingredientsEnd = -1;
+  
+  for (let i = 0; i < recipeLines.length; i++) {
+    if (recipeLines[i].toLowerCase().includes('ingredient') && ingredientsStart === -1) {
+      ingredientsStart = i + 1;
+    } else if (ingredientsStart !== -1 && 
+              (recipeLines[i].toLowerCase().includes('instruction') || 
+               recipeLines[i].toLowerCase().includes('direction') || 
+               recipeLines[i].toLowerCase().includes('preparation'))) {
+      ingredientsEnd = i;
+      break;
+    }
+  }
+  
+  if (ingredientsStart !== -1 && ingredientsEnd !== -1) {
+    ingredients = recipeLines.slice(ingredientsStart, ingredientsEnd)
+      .filter(line => line.trim().length > 0)
+      .map(line => line.replace(/^\s*[-•*]\s*/, '').trim()); // Remove bullet points
+  }
+  
+  // Try to identify instructions
+  let instructions: string[] = [];
+  let instructionsStart = -1;
+  
+  for (let i = 0; i < recipeLines.length; i++) {
+    if ((recipeLines[i].toLowerCase().includes('instruction') || 
+         recipeLines[i].toLowerCase().includes('direction') || 
+         recipeLines[i].toLowerCase().includes('preparation')) && 
+        instructionsStart === -1) {
+      instructionsStart = i + 1;
+      break;
+    }
+  }
+  
+  if (instructionsStart !== -1) {
+    instructions = recipeLines.slice(instructionsStart)
+      .filter(line => line.trim().length > 0)
+      .map(line => {
+        // Remove step numbers and bullet points
+        let cleanedLine = line.replace(/^\s*\d+\.\s*/, '').replace(/^\s*[-•*]\s*/, '').trim();
+        return cleanedLine;
+      });
+  }
+  
+  // Try to identify dietary information
+  const dietTypes = ['vegetarian', 'vegan', 'gluten-free', 'keto', 'paleo', 'low-carb', 'high-protein'];
+  const diets = dietTypes.filter(diet => aiReply.toLowerCase().includes(diet));
+  
+  return {
+    title: title,
+    summary: aiReply.substring(0, 250) + "...",
+    image: "https://images.unsplash.com/photo-1512621776951-a57141f2eefd?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80",
+    readyInMinutes: 30,
+    servings: 2,
+    diets: diets.length > 0 ? diets : ["Balanced"],
+    ingredients: ingredients,
+    instructions: instructions,
+    nutrition: {
+      calories: 300,
+      protein: 25,
+      carbs: 40,
+      fat: 15
+    }
+  };
 }
 
 serve(async (req) => {
@@ -196,7 +302,7 @@ serve(async (req) => {
       additionalData = await fetchRecipeData(message);
       dataSource = 'recipe';
       if (additionalData) {
-        const recipeSummary = additionalData.map(recipe => 
+        const recipeSummary = additionalData.map((recipe: any) => 
           `Title: ${recipe.title}, Calories: ${recipe.nutrition?.calories || 'N/A'}, Diet: ${recipe.diets?.join(', ') || 'N/A'}`
         ).join('\n');
         
@@ -204,6 +310,8 @@ serve(async (req) => {
           role: 'system',
           content: `I found these recipes that might be relevant to the user's query. Use this data to provide specific meal recommendations:\n\n${recipeSummary}\n\nRemember to format meal plans as described earlier if the user wants to save them.`
         });
+      } else if (!additionalData || additionalData.length === 0) {
+        additionalData = [generateBasicRecipe(message)];
       }
     }
     
@@ -235,7 +343,7 @@ serve(async (req) => {
     
     console.log('OpenAI response received:', assistantReply.substring(0, 200) + '...');
     
-    // Check if the response contains a workout plan that needs to be parsed
+    // Check if the response contains a workout plan or meal plan
     const workoutPlanMatch = assistantReply.match(/WORKOUT_PLAN: (.*?)\|(.*?)\|(.*?)\|(.*?)\|(.*)/s);
     const mealPlanMatch = assistantReply.match(/MEAL_PLAN: (.*?)\|(.*?)\|(.*?)\|(.*)/s);
     

@@ -112,7 +112,7 @@ const RecipePreview: React.FC<RecipePreviewProps> = ({ recipeData, onSaveRecipe 
             className="w-full bg-green-600 hover:bg-green-700 text-white"
             size="sm"
           >
-            Save Recipe
+            Add to Nutrition
           </Button>
         </CardFooter>
       </Card>

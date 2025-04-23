@@ -3,6 +3,7 @@ import React from 'react';
 import { Message } from './GeminiChat';
 import GeminiMessageItem from './GeminiMessageItem';
 import WorkoutPreview from './WorkoutPreview';
+import RecipePreview from '../gemini/RecipePreview';
 import RecipePackPreview from './RecipePackPreview';
 
 interface GeminiMessageListProps {
@@ -55,8 +56,6 @@ const GeminiMessageList: React.FC<GeminiMessageListProps> = ({
   const handleAddRecipePack = (recipes: any[]) => {
     if (!onSaveRecipe || !recipes.length) return;
     
-    console.log("Handling recipe pack save:", recipes);
-    
     // Format the first recipe for saving
     const recipe = recipes[0];
     const formattedRecipe = {
@@ -94,14 +93,14 @@ const GeminiMessageList: React.FC<GeminiMessageListProps> = ({
 
           {message.recipeData && Array.isArray(message.recipeData) && message.recipeData.length > 0 && (
             <div className="mt-2">
-              <RecipePackPreview
-                recipes={message.recipeData}
-                onAddRecipe={handleAddRecipePack}
+              <RecipePreview
+                recipeData={message.recipeData}
+                onSaveRecipe={onSaveRecipe}
               />
             </div>
           )}
           
-          {/* Always show recipe button for messages that mention food/recipes */}
+          {/* Always show recipe button for AI messages that mention food/recipes but don't have recipe data */}
           {!message.recipeData && 
            message.sender === 'ai' && 
            (message.content.toLowerCase().includes('recipe') || 
