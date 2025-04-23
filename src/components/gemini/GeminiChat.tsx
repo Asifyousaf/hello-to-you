@@ -115,7 +115,7 @@ const GeminiChat: React.FC<GeminiChatProps> = ({ visible = false, onClose }) => 
       toast({
         title: "Sign in required",
         description: "Please sign in to save recipes",
-        variant: "default",
+        variant: "default"
       });
       return;
     }
@@ -142,7 +142,7 @@ const GeminiChat: React.FC<GeminiChatProps> = ({ visible = false, onClose }) => 
           tags: recipe.diets || recipe.tags || ["AI Generated"],
           category: "ai"
         })
-      });
+      };
   
       const { error } = await supabase
         .from('nutrition_logs')
@@ -154,7 +154,7 @@ const GeminiChat: React.FC<GeminiChatProps> = ({ visible = false, onClose }) => 
       
       toast({
         title: "Recipe Saved",
-        description: "The recipe has been saved to your nutrition collection",
+        description: "The recipe has been saved to your nutrition collection"
       });
       
       navigate('/nutrition');
@@ -175,7 +175,7 @@ const GeminiChat: React.FC<GeminiChatProps> = ({ visible = false, onClose }) => 
       toast({
         title: "Sign in required",
         description: "Please sign in to save workout plans",
-        variant: "default",
+        variant: "default"
       });
       return;
     }
@@ -210,7 +210,7 @@ const GeminiChat: React.FC<GeminiChatProps> = ({ visible = false, onClose }) => 
       
       toast({
         title: workout.isWorkoutPack ? "Workout Pack Added" : "Workout Added",
-        description: `The workout ${workout.isWorkoutPack ? 'pack' : ''} has been added to your workout plan`,
+        description: `The workout ${workout.isWorkoutPack ? 'pack' : ''} has been added to your workout plan`
       });
       
       navigate('/workouts');
