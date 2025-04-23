@@ -7,6 +7,85 @@ import useSounds from '@/hooks/useSounds';
 
 const CHAT_HISTORY_KEY = 'gemini_chat_history';
 
+// Function to extract recipe data from text content
+const extractRecipeDataFromText = (content: string): any[] | null => {
+  // Check if this appears to be a recipe
+  const isRecipe = 
+    content.toLowerCase().includes('recipe') || 
+    content.toLowerCase().includes('ingredients') ||
+    (content.toLowerCase().includes('instructions') && content.toLowerCase().includes('minutes'));
+    
+  if (!isRecipe) return null;
+  
+  try {
+    // Try to extract ingredients
+    let ingredients: string[] = [];
+    if (content.toLowerCase().includes('ingredients:')) {
+      const ingredientsSection = content.split('ingredients:')[1]?.split(/instructions:|directions:|steps:|method:/i)[0];
+      if (ingredientsSection) {
+        ingredients = ingredientsSection
+          .split('\n')
+          .map(line => line.trim())
+          .filter(line => line && line.length > 3)
+          .map(line => line.replace(/^[-•*]\s*/, ''));
+      }
+    }
+    
+    // Try to extract instructions
+    let instructions: string[] = [];
+    if (content.toLowerCase().includes('instructions:') || content.toLowerCase().includes('directions:')) {
+      const instructionsSection = content
+        .split(/instructions:|directions:/i)[1]
+        ?.split(/nutrition information:|nutritional info:|notes:/i)[0];
+      if (instructionsSection) {
+        instructions = instructionsSection
+          .split('\n')
+          .map(line => line.trim())
+          .filter(line => line && line.length > 5)
+          .map(line => line.replace(/^\d+\.\s*/, ''));
+      }
+    }
+    
+    // Extract title (usually the first line)
+    const title = content.split('\n')[0]?.trim() || 'AI Generated Recipe';
+    
+    // Try to extract nutritional information
+    let calories = 300;
+    let protein = 25;
+    let carbs = 40;
+    let fat = 15;
+    
+    const caloriesMatch = content.match(/calories:?\s*(\d+)/i);
+    if (caloriesMatch && caloriesMatch[1]) calories = parseInt(caloriesMatch[1]);
+    
+    const proteinMatch = content.match(/protein:?\s*(\d+)/i);
+    if (proteinMatch && proteinMatch[1]) protein = parseInt(proteinMatch[1]);
+    
+    const carbsMatch = content.match(/carb[s]?:?\s*(\d+)/i);
+    if (carbsMatch && carbsMatch[1]) carbs = parseInt(carbsMatch[1]);
+    
+    const fatMatch = content.match(/fat:?\s*(\d+)/i);
+    if (fatMatch && fatMatch[1]) fat = parseInt(fatMatch[1]);
+    
+    return [{
+      title,
+      summary: content,
+      calories,
+      protein,
+      carbs,
+      fat,
+      ingredients,
+      instructions,
+      servings: 2,
+      tags: ['AI Generated'],
+      image: "https://images.unsplash.com/photo-1512621776951-a57141f2eefd?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80"
+    }];
+  } catch (error) {
+    console.error("Error extracting recipe data:", error);
+    return null;
+  }
+};
+
 export const useGeminiChat = (isSoundEnabled: boolean, volume: number) => {
   const [message, setMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -87,29 +166,45 @@ export const useGeminiChat = (isSoundEnabled: boolean, volume: number) => {
         play('success', { volume: volume / 100 });
       }
       
+      // Determine if this is likely a nutrition/recipe query
       const isRecipeQuery = userMessage.toLowerCase().includes('recipe') || 
                            userMessage.toLowerCase().includes('meal') || 
                            userMessage.toLowerCase().includes('food') || 
                            userMessage.toLowerCase().includes('eat') ||
-                           userMessage.toLowerCase().includes('cook');
+                           userMessage.toLowerCase().includes('cook') ||
+                           userMessage.toLowerCase().includes('diet');
       
+      // Get recipe data from API or extract from AI response
       let recipeData = data.recipeData || [];
+      let dataType = data.dataType;
       
-      if (isRecipeQuery && recipeData.length === 0) {
+      // If this is a recipe query but we didn't get structured recipe data,
+      // try to extract it from the AI response text
+      if (isRecipeQuery && (!recipeData || recipeData.length === 0)) {
         const aiResponse = data.reply || "";
         
-        recipeData = [{
-          title: aiResponse.split('\n')[0] || "AI Generated Recipe",
-          summary: aiResponse,
-          calories: 300,
-          protein: 25,
-          carbs: 40, 
-          fat: 15,
-          image: "https://images.unsplash.com/photo-1512621776951-a57141f2eefd?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80",
-          diets: ["Balanced"],
-          readyInMinutes: 30,
-          servings: 2
-        }];
+        // Try to extract structured recipe data from the text
+        const extractedRecipeData = extractRecipeDataFromText(aiResponse);
+        
+        if (extractedRecipeData && extractedRecipeData.length > 0) {
+          recipeData = extractedRecipeData;
+          dataType = 'recipe';
+        } else {
+          // Fallback to a simple recipe template if we couldn't extract data
+          recipeData = [{
+            title: aiResponse.split('\n')[0] || "AI Generated Recipe",
+            summary: aiResponse,
+            calories: 300,
+            protein: 25,
+            carbs: 40, 
+            fat: 15,
+            image: "https://images.unsplash.com/photo-1512621776951-a57141f2eefd?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80",
+            diets: ["Balanced"],
+            readyInMinutes: 30,
+            servings: 2
+          }];
+          dataType = 'recipe';
+        }
       }
       
       const aiMessage: Message = {
@@ -119,7 +214,7 @@ export const useGeminiChat = (isSoundEnabled: boolean, volume: number) => {
         timestamp: new Date(),
         workoutData: data.workoutData || [],
         recipeData: recipeData,
-        dataType: data.dataType || (isRecipeQuery ? 'recipe' : null)
+        dataType: dataType || (isRecipeQuery ? 'recipe' : null)
       };
       
       setConversation(prev => [...prev, aiMessage]);
@@ -133,7 +228,7 @@ export const useGeminiChat = (isSoundEnabled: boolean, volume: number) => {
       toast({
         title: "Error",
         description: "Failed to get response. Please try again.",
-        variant: "destructive",
+        variant: "destructive"
       });
       
       const errorMessage: Message = {

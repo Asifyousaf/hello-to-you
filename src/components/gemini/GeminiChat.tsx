@@ -121,6 +121,7 @@ const GeminiChat: React.FC<GeminiChatProps> = ({ visible = false, onClose }) => 
     }
   
     try {
+      // Ensure we have all necessary recipe data and format it correctly
       const recipeData = {
         user_id: user.id,
         food_name: recipe.title || "AI Generated Recipe",
@@ -143,6 +144,8 @@ const GeminiChat: React.FC<GeminiChatProps> = ({ visible = false, onClose }) => 
           category: "ai"
         })
       };
+  
+      console.log("Saving recipe data:", recipeData);
   
       const { error } = await supabase
         .from('nutrition_logs')
