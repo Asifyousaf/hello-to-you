@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Message } from './GeminiChat';
 import GeminiMessageItem from './GeminiMessageItem';
@@ -56,34 +55,24 @@ const GeminiMessageList: React.FC<GeminiMessageListProps> = ({
   const handleAddRecipePack = (recipes: any[]) => {
     if (!onSaveRecipe || !recipes.length) return;
     
-    // Format the first recipe for saving
     const recipe = recipes[0];
     const formattedRecipe = {
       title: recipe.title || "AI Generated Recipe",
-      calories: recipe.nutrition?.calories || recipe.calories || 300,
-      protein: recipe.nutrition?.protein || recipe.protein || 25,
-      carbs: recipe.nutrition?.carbs || recipe.carbs || 40,
-      fat: recipe.nutrition?.fat || recipe.fat || 15,
+      calories: recipe.calories || 300,
+      protein: recipe.protein || 25,
+      carbs: recipe.carbs || 40,
+      fat: recipe.fat || 15,
       image: recipe.image || "https://images.unsplash.com/photo-1512621776951-a57141f2eefd?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80",
       servings: recipe.servings || 2,
       summary: recipe.summary || "AI-generated recipe",
-      ingredients: Array.isArray(recipe.extendedIngredients) 
-        ? recipe.extendedIngredients.map((ing: any) => ing.original) 
-        : Array.isArray(recipe.ingredients) 
-          ? recipe.ingredients 
-          : [],
-      instructions: Array.isArray(recipe.analyzedInstructions) && recipe.analyzedInstructions[0]?.steps
-        ? recipe.analyzedInstructions[0].steps.map((step: any) => step.step)
-        : Array.isArray(recipe.instructions)
-          ? recipe.instructions
-          : [],
+      ingredients: Array.isArray(recipe.ingredients) ? recipe.ingredients : [],
+      instructions: Array.isArray(recipe.instructions) ? recipe.instructions : [],
       tags: recipe.diets || recipe.tags || ["AI Generated"]
     };
     
     onSaveRecipe(formattedRecipe);
   };
 
-  // Function to determine if message is primarily about recipes/nutrition
   const isNutritionFocused = (message: Message) => {
     if (message.dataType === 'recipe') return true;
     if (message.recipeData && message.recipeData.length > 0) return true;
@@ -95,7 +84,6 @@ const GeminiMessageList: React.FC<GeminiMessageListProps> = ({
     
     const content = message.content.toLowerCase();
     
-    // If message is asking about pre/post workout meals, it's nutrition focused
     if ((content.includes('eat') || content.includes('food') || content.includes('meal')) && 
         (content.includes('before workout') || content.includes('after workout') || 
         content.includes('pre workout') || content.includes('post workout'))) {
@@ -105,10 +93,11 @@ const GeminiMessageList: React.FC<GeminiMessageListProps> = ({
     return nutritionKeywords.some(keyword => content.includes(keyword));
   };
   
-  // Function to determine if message is primarily about workouts/exercises
   const isWorkoutFocused = (message: Message) => {
     if (message.dataType === 'exercise') return true;
     if (message.workoutData && message.workoutData.length > 0) return true;
+    
+    if (message.dataType === 'recipe') return false;
     
     const workoutKeywords = [
       'workout', 'exercise', 'training', 'gym', 'fitness', 'strength',
@@ -117,14 +106,12 @@ const GeminiMessageList: React.FC<GeminiMessageListProps> = ({
     
     const content = message.content.toLowerCase();
     
-    // Messages about eating before workouts are not workout focused
     if ((content.includes('eat') || content.includes('food') || content.includes('meal')) && 
         (content.includes('before workout') || content.includes('after workout') || 
         content.includes('pre workout') || content.includes('post workout'))) {
       return false;
     }
     
-    // Check if a nutrition query just happens to contain the word "workout"
     if (isNutritionFocused(message) && 
         (content.includes('before workout') || content.includes('after workout') || 
         content.includes('pre workout') || content.includes('post workout'))) {
@@ -140,7 +127,6 @@ const GeminiMessageList: React.FC<GeminiMessageListProps> = ({
         <div key={message.id}>
           <GeminiMessageItem message={message} />
 
-          {/* Show workout preview only if it has workout data AND is workout focused */}
           {message.workoutData && Array.isArray(message.workoutData) && message.workoutData.length > 0 && 
            isWorkoutFocused(message) && !isNutritionFocused(message) && (
             <div className="mt-2">
@@ -152,7 +138,6 @@ const GeminiMessageList: React.FC<GeminiMessageListProps> = ({
             </div>
           )}
 
-          {/* Show recipe preview if it has recipe data */}
           {message.recipeData && Array.isArray(message.recipeData) && message.recipeData.length > 0 && (
             <div className="mt-2">
               <RecipePreview
@@ -162,10 +147,10 @@ const GeminiMessageList: React.FC<GeminiMessageListProps> = ({
             </div>
           )}
           
-          {/* Always show recipe button for AI messages that mention food/recipes but don't have recipe data */}
           {!message.recipeData && 
            message.sender === 'ai' && 
-           isNutritionFocused(message) && (
+           isNutritionFocused(message) && 
+           !isWorkoutFocused(message) && (
             <div className="mt-2">
               <RecipePackPreview
                 recipes={[{

@@ -1,3 +1,4 @@
+
 import React from "react";
 import { Button } from "@/components/ui/button";
 import { Utensils } from "lucide-react";
@@ -42,20 +43,27 @@ const RecipePackPreview: React.FC<RecipePackPreviewProps> = ({ recipes, onAddRec
   const handleAddRecipe = () => {
     if (onAddRecipe) {
       // Ensure each recipe has proper structure before saving
-      const formattedRecipes = recipes.map(recipe => ({
-        ...recipe,
-        title: recipe.title || "AI Generated Recipe",
-        calories: recipe.nutrition?.calories || recipe.calories || 300,
-        protein: recipe.nutrition?.protein || recipe.protein || 25,
-        carbs: recipe.nutrition?.carbs || recipe.carbs || 40,
-        fat: recipe.nutrition?.fat || recipe.fat || 15,
-        servings: recipe.servings || 2,
-        image: recipe.image || "https://images.unsplash.com/photo-1512621776951-a57141f2eefd?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80",
-        summary: recipe.summary || "AI-generated recipe",
-        ingredients: Array.isArray(recipe.ingredients) ? recipe.ingredients : [],
-        instructions: Array.isArray(recipe.instructions) ? recipe.instructions : [],
-        tags: recipe.tags || recipe.diets || ["AI Generated"]
-      }));
+      const formattedRecipes = recipes.map(recipe => {
+        // Extract values, defaulting to reasonable values if not present
+        const calories = recipe.nutrition?.calories || recipe.calories || 300;
+        const protein = recipe.nutrition?.protein || recipe.protein || 25;
+        const carbs = recipe.nutrition?.carbs || recipe.carbs || 40;
+        const fat = recipe.nutrition?.fat || recipe.fat || 15;
+        
+        return {
+          title: recipe.title || "AI Generated Recipe",
+          calories: calories,
+          protein: protein,
+          carbs: carbs,
+          fat: fat,
+          servings: recipe.servings || 2,
+          image: recipe.image || "https://images.unsplash.com/photo-1512621776951-a57141f2eefd?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80",
+          summary: recipe.summary || "AI-generated recipe",
+          ingredients: Array.isArray(recipe.ingredients) ? recipe.ingredients : [],
+          instructions: Array.isArray(recipe.instructions) ? recipe.instructions : [],
+          tags: recipe.tags || recipe.diets || ["AI Generated"]
+        };
+      });
       
       console.log("Formatted recipes to add:", formattedRecipes);
       onAddRecipe(formattedRecipes);

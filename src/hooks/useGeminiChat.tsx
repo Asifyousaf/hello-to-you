@@ -173,7 +173,7 @@ export const useGeminiChat = (isSoundEnabled: boolean, volume: number) => {
       }
       
       // Determine if this is likely a nutrition/recipe query
-      const isRecipeQuery = userMessage.toLowerCase().includes('recipe') || 
+      const isNutritionQuery = userMessage.toLowerCase().includes('recipe') || 
                            userMessage.toLowerCase().includes('meal') || 
                            userMessage.toLowerCase().includes('food') || 
                            userMessage.toLowerCase().includes('eat') ||
@@ -181,13 +181,21 @@ export const useGeminiChat = (isSoundEnabled: boolean, volume: number) => {
                            userMessage.toLowerCase().includes('diet') ||
                            userMessage.toLowerCase().includes('nutrition');
       
+      // Workout-related keywords
+      const workoutKeywords = ['workout', 'exercise', 'training', 'gym', 'fitness', 'strength',
+        'cardio', 'sets', 'reps', 'routine'];
+      
+      // Check if this is specifically about eating related to workouts
+      const isPrePostWorkoutMealQuery = userMessage.toLowerCase().match(/(?:what|how|when).+(?:eat|food|meal).+(?:before|after|pre|post).+workout/i) ||
+                                       userMessage.toLowerCase().match(/(?:before|after|pre|post).+workout.+(?:eat|food|meal)/i);
+                                       
       // Get recipe data from API or extract from AI response
       let recipeData = data.recipeData || [];
       let dataType = data.dataType;
       
-      // If this is a recipe query but we didn't get structured recipe data,
+      // If this is a nutrition query but we didn't get structured recipe data,
       // try to extract it from the AI response text
-      if (isRecipeQuery && (!recipeData || recipeData.length === 0)) {
+      if (isNutritionQuery && (!recipeData || recipeData.length === 0)) {
         const aiResponse = data.reply || "";
         
         // Try to extract structured recipe data from the text
@@ -196,7 +204,7 @@ export const useGeminiChat = (isSoundEnabled: boolean, volume: number) => {
         if (extractedRecipeData && extractedRecipeData.length > 0) {
           recipeData = extractedRecipeData;
           dataType = 'recipe';
-        } else if (isRecipeQuery) {
+        } else if (isNutritionQuery) {
           // Fallback to a simple recipe template if we couldn't extract data
           recipeData = [{
             title: aiResponse.split('\n')[0] || "AI Generated Recipe",
@@ -217,11 +225,11 @@ export const useGeminiChat = (isSoundEnabled: boolean, volume: number) => {
       }
       
       // Special handling for queries about eating around workouts
-      const isPrePostWorkoutMealQuery = userMessage.toLowerCase().match(/(?:what|how|when).+(?:eat|food|meal).+(?:before|after|pre|post).+workout/i) ||
-                                       userMessage.toLowerCase().match(/(?:before|after|pre|post).+workout.+(?:eat|food|meal)/i);
-                                       
       if (isPrePostWorkoutMealQuery) {
         dataType = 'recipe';
+        // Override any workout data assignment when it's clearly a meal query
+        data.workoutData = [];
+        
         // If we don't already have recipe data, create some
         if (!recipeData || recipeData.length === 0) {
           recipeData = [{
@@ -250,7 +258,7 @@ export const useGeminiChat = (isSoundEnabled: boolean, volume: number) => {
         timestamp: new Date(),
         workoutData: data.workoutData || [],
         recipeData: recipeData,
-        dataType: dataType || (isRecipeQuery ? 'recipe' : null)
+        dataType: dataType || (isNutritionQuery ? 'recipe' : null)
       };
       
       setConversation(prev => [...prev, aiMessage]);

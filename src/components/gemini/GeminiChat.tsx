@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { MessageSquare } from 'lucide-react';
@@ -122,45 +123,45 @@ const GeminiChat: React.FC<GeminiChatProps> = ({ visible = false, onClose }) => 
     try {
       console.log("Original recipe data:", recipe);
       
+      // Format recipe details for storage - ensure it's properly structured
+      const recipeDetails = {
+        image: recipe.image || "https://images.unsplash.com/photo-1512621776951-a57141f2eefd?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80",
+        time: recipe.readyInMinutes ? `${recipe.readyInMinutes} min` : "20 min",
+        servings: recipe.servings || 2,
+        description: recipe.summary || "AI-generated recipe",
+        ingredients: Array.isArray(recipe.ingredients) ? recipe.ingredients : [],
+        instructions: Array.isArray(recipe.instructions) ? recipe.instructions : [],
+        tags: recipe.diets || recipe.tags || ["AI Generated"],
+        category: "ai"
+      };
+      
+      // Prepare recipe data for database insertion
       const recipeData = {
         user_id: user.id,
         food_name: recipe.title || "AI Generated Recipe",
-        calories: recipe.nutrition?.calories || recipe.calories || 300,
-        protein: recipe.nutrition?.protein || recipe.protein || 25,
-        carbs: recipe.nutrition?.carbs || recipe.carbs || 40,
-        fat: recipe.nutrition?.fat || recipe.fat || 15,
+        calories: recipe.calories || 300,
+        protein: recipe.protein || 25,
+        carbs: recipe.carbs || 40,
+        fat: recipe.fat || 15,
         meal_type: "recipe",
         date: new Date().toISOString().split('T')[0],
-        recipe_details: JSON.stringify({
-          image: recipe.image || "https://images.unsplash.com/photo-1512621776951-a57141f2eefd?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80",
-          time: recipe.readyInMinutes ? `${recipe.readyInMinutes} min` : "20 min",
-          servings: recipe.servings || 2,
-          description: recipe.summary || "AI-generated recipe",
-          ingredients: Array.isArray(recipe.extendedIngredients) 
-            ? recipe.extendedIngredients.map((ing: any) => ing.original) 
-            : Array.isArray(recipe.ingredients) 
-              ? recipe.ingredients 
-              : [],
-          instructions: Array.isArray(recipe.analyzedInstructions) && recipe.analyzedInstructions[0]?.steps
-            ? recipe.analyzedInstructions[0].steps.map((step: any) => step.step)
-            : Array.isArray(recipe.instructions)
-              ? recipe.instructions
-              : [],
-          tags: recipe.diets || recipe.tags || ["AI Generated"],
-          category: "ai"
-        })
+        recipe_details: JSON.stringify(recipeDetails)
       };
   
       console.log("Formatted recipe data to save:", recipeData);
   
-      const { error } = await supabase
+      // Insert recipe into nutrition_logs table
+      const { data, error } = await supabase
         .from('nutrition_logs')
-        .insert(recipeData);
+        .insert(recipeData)
+        .select();
       
       if (error) {
         console.error("Supabase error saving recipe:", error);
         throw error;
       }
+      
+      console.log("Recipe saved successfully:", data);
       
       if (isSoundEnabled) play('success', { volume: volume / 100 });
       

@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { User, Bot, Loader2 } from 'lucide-react';
+import { User, Bot } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Message } from './GeminiChat';
 
@@ -14,8 +14,13 @@ const GeminiMessageItem: React.FC<GeminiMessageItemProps> = ({ message }) => {
     if (!content) return [];
     
     return content.split('\n').map((line, i) => {
-      if (!line.trim()) return <React.Fragment key={i}><br /></React.Fragment>;
-      return <React.Fragment key={i}>{line}<br /></React.Fragment>;
+      if (!line.trim()) return <br key={i} />;
+      return (
+        <React.Fragment key={i}>
+          {line}
+          <br />
+        </React.Fragment>
+      );
     });
   };
 
