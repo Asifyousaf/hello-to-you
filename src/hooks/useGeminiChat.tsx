@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Message } from '@/components/gemini/GeminiChat';
 import { supabase } from '@/integrations/supabase/client';
@@ -21,7 +20,7 @@ const extractRecipeDataFromText = (content: string): any[] | null => {
     // Try to extract ingredients
     let ingredients: string[] = [];
     if (content.toLowerCase().includes('ingredients:')) {
-      const ingredientsSection = content.split('ingredients:')[1]?.split(/instructions:|directions:|steps:|method:/i)[0];
+      const ingredientsSection = content.split(/ingredients:|ingredients/i)[1]?.split(/instructions:|directions:|steps:|method:|preparation:|preparation|nutritional information:/i)[0];
       if (ingredientsSection) {
         ingredients = ingredientsSection
           .split('\n')
@@ -33,10 +32,10 @@ const extractRecipeDataFromText = (content: string): any[] | null => {
     
     // Try to extract instructions
     let instructions: string[] = [];
-    if (content.toLowerCase().includes('instructions:') || content.toLowerCase().includes('directions:')) {
+    if (content.toLowerCase().includes('instructions:') || content.toLowerCase().includes('directions:') || content.toLowerCase().includes('preparation:')) {
       const instructionsSection = content
-        .split(/instructions:|directions:/i)[1]
-        ?.split(/nutrition information:|nutritional info:|notes:/i)[0];
+        .split(/instructions:|directions:|preparation:/i)[1]
+        ?.split(/nutrition information:|nutritional info:|notes:|nutrition:|enjoy!/i)[0];
       if (instructionsSection) {
         instructions = instructionsSection
           .split('\n')
@@ -46,8 +45,15 @@ const extractRecipeDataFromText = (content: string): any[] | null => {
       }
     }
     
-    // Extract title (usually the first line)
-    const title = content.split('\n')[0]?.trim() || 'AI Generated Recipe';
+    // Extract title (first line or after Recipe for: or similar)
+    let title = "AI Generated Recipe";
+    if (content.includes('Recipe for:')) {
+      title = content.split('Recipe for:')[1]?.split('\n')[0].trim() || title;
+    } else if (content.includes('Recipe:')) {
+      title = content.split('Recipe:')[1]?.split('\n')[0].trim() || title;
+    } else {
+      title = content.split('\n')[0]?.trim() || title;
+    }
     
     // Try to extract nutritional information
     let calories = 300;
@@ -172,7 +178,8 @@ export const useGeminiChat = (isSoundEnabled: boolean, volume: number) => {
                            userMessage.toLowerCase().includes('food') || 
                            userMessage.toLowerCase().includes('eat') ||
                            userMessage.toLowerCase().includes('cook') ||
-                           userMessage.toLowerCase().includes('diet');
+                           userMessage.toLowerCase().includes('diet') ||
+                           userMessage.toLowerCase().includes('nutrition');
       
       // Get recipe data from API or extract from AI response
       let recipeData = data.recipeData || [];
@@ -189,7 +196,7 @@ export const useGeminiChat = (isSoundEnabled: boolean, volume: number) => {
         if (extractedRecipeData && extractedRecipeData.length > 0) {
           recipeData = extractedRecipeData;
           dataType = 'recipe';
-        } else {
+        } else if (isRecipeQuery) {
           // Fallback to a simple recipe template if we couldn't extract data
           recipeData = [{
             title: aiResponse.split('\n')[0] || "AI Generated Recipe",
@@ -201,11 +208,40 @@ export const useGeminiChat = (isSoundEnabled: boolean, volume: number) => {
             image: "https://images.unsplash.com/photo-1512621776951-a57141f2eefd?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80",
             diets: ["Balanced"],
             readyInMinutes: 30,
-            servings: 2
+            servings: 2,
+            ingredients: [],
+            instructions: []
           }];
           dataType = 'recipe';
         }
       }
+      
+      // Special handling for queries about eating around workouts
+      const isPrePostWorkoutMealQuery = userMessage.toLowerCase().match(/(?:what|how|when).+(?:eat|food|meal).+(?:before|after|pre|post).+workout/i) ||
+                                       userMessage.toLowerCase().match(/(?:before|after|pre|post).+workout.+(?:eat|food|meal)/i);
+                                       
+      if (isPrePostWorkoutMealQuery) {
+        dataType = 'recipe';
+        // If we don't already have recipe data, create some
+        if (!recipeData || recipeData.length === 0) {
+          recipeData = [{
+            title: "Pre/Post Workout Meal",
+            summary: data.reply || "",
+            calories: 300,
+            protein: 25,
+            carbs: 40,
+            fat: 15,
+            image: "https://images.unsplash.com/photo-1512621776951-a57141f2eefd?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80",
+            diets: ["Sports Nutrition"],
+            readyInMinutes: 15,
+            servings: 1,
+            ingredients: [],
+            instructions: []
+          }];
+        }
+      }
+      
+      console.log("Recipe data:", recipeData, "Data type:", dataType);
       
       const aiMessage: Message = {
         id: (Date.now() + 1).toString(),

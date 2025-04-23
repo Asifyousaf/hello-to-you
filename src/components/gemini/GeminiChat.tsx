@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { MessageSquare } from 'lucide-react';
@@ -121,7 +120,8 @@ const GeminiChat: React.FC<GeminiChatProps> = ({ visible = false, onClose }) => 
     }
   
     try {
-      // Ensure we have all necessary recipe data and format it correctly
+      console.log("Original recipe data:", recipe);
+      
       const recipeData = {
         user_id: user.id,
         food_name: recipe.title || "AI Generated Recipe",
@@ -136,22 +136,31 @@ const GeminiChat: React.FC<GeminiChatProps> = ({ visible = false, onClose }) => 
           time: recipe.readyInMinutes ? `${recipe.readyInMinutes} min` : "20 min",
           servings: recipe.servings || 2,
           description: recipe.summary || "AI-generated recipe",
-          ingredients: recipe.extendedIngredients?.map((ing: any) => ing.original) || 
-                      recipe.ingredients || [],
-          instructions: recipe.analyzedInstructions?.[0]?.steps?.map((step: any) => step.step) || 
-                      recipe.instructions || [],
+          ingredients: Array.isArray(recipe.extendedIngredients) 
+            ? recipe.extendedIngredients.map((ing: any) => ing.original) 
+            : Array.isArray(recipe.ingredients) 
+              ? recipe.ingredients 
+              : [],
+          instructions: Array.isArray(recipe.analyzedInstructions) && recipe.analyzedInstructions[0]?.steps
+            ? recipe.analyzedInstructions[0].steps.map((step: any) => step.step)
+            : Array.isArray(recipe.instructions)
+              ? recipe.instructions
+              : [],
           tags: recipe.diets || recipe.tags || ["AI Generated"],
           category: "ai"
         })
       };
   
-      console.log("Saving recipe data:", recipeData);
+      console.log("Formatted recipe data to save:", recipeData);
   
       const { error } = await supabase
         .from('nutrition_logs')
         .insert(recipeData);
       
-      if (error) throw error;
+      if (error) {
+        console.error("Supabase error saving recipe:", error);
+        throw error;
+      }
       
       if (isSoundEnabled) play('success', { volume: volume / 100 });
       

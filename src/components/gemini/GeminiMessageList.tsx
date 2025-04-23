@@ -67,8 +67,16 @@ const GeminiMessageList: React.FC<GeminiMessageListProps> = ({
       image: recipe.image || "https://images.unsplash.com/photo-1512621776951-a57141f2eefd?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80",
       servings: recipe.servings || 2,
       summary: recipe.summary || "AI-generated recipe",
-      ingredients: recipe.extendedIngredients?.map((ing: any) => ing.original) || recipe.ingredients || [],
-      instructions: recipe.analyzedInstructions?.[0]?.steps?.map((step: any) => step.step) || recipe.instructions || [],
+      ingredients: Array.isArray(recipe.extendedIngredients) 
+        ? recipe.extendedIngredients.map((ing: any) => ing.original) 
+        : Array.isArray(recipe.ingredients) 
+          ? recipe.ingredients 
+          : [],
+      instructions: Array.isArray(recipe.analyzedInstructions) && recipe.analyzedInstructions[0]?.steps
+        ? recipe.analyzedInstructions[0].steps.map((step: any) => step.step)
+        : Array.isArray(recipe.instructions)
+          ? recipe.instructions
+          : [],
       tags: recipe.diets || recipe.tags || ["AI Generated"]
     };
     
@@ -109,8 +117,15 @@ const GeminiMessageList: React.FC<GeminiMessageListProps> = ({
     
     const content = message.content.toLowerCase();
     
-    // Make sure messages about eating before workouts are not classified as workout focused
+    // Messages about eating before workouts are not workout focused
     if ((content.includes('eat') || content.includes('food') || content.includes('meal')) && 
+        (content.includes('before workout') || content.includes('after workout') || 
+        content.includes('pre workout') || content.includes('post workout'))) {
+      return false;
+    }
+    
+    // Check if a nutrition query just happens to contain the word "workout"
+    if (isNutritionFocused(message) && 
         (content.includes('before workout') || content.includes('after workout') || 
         content.includes('pre workout') || content.includes('post workout'))) {
       return false;
@@ -127,7 +142,7 @@ const GeminiMessageList: React.FC<GeminiMessageListProps> = ({
 
           {/* Show workout preview only if it has workout data AND is workout focused */}
           {message.workoutData && Array.isArray(message.workoutData) && message.workoutData.length > 0 && 
-           isWorkoutFocused(message) && (
+           isWorkoutFocused(message) && !isNutritionFocused(message) && (
             <div className="mt-2">
               <WorkoutPreview 
                 workoutData={message.workoutData} 

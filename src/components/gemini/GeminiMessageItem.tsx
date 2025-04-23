@@ -14,7 +14,7 @@ const GeminiMessageItem: React.FC<GeminiMessageItemProps> = ({ message }) => {
     if (!content) return [];
     
     return content.split('\n').map((line, i) => {
-      if (!line.trim()) return <React.Fragment key={i}>&nbsp;</React.Fragment>;
+      if (!line.trim()) return <React.Fragment key={i}><br /></React.Fragment>;
       return <React.Fragment key={i}>{line}<br /></React.Fragment>;
     });
   };
